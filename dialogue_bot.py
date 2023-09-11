@@ -56,6 +56,33 @@ class DialogueBot:
             print("output is written.")
         return response
     
+    def learn(self, datasets):
+        if torch.cuda.is_available():
+            model = self.model.to("cuda")
+            print("using cuda")
+        else:
+            print("No GPU. Learning is unavailable.")
+            return
+
+        inputs = self.tokenizer([pair[0] for pair in datasets], return_tensors='pt', padding=True, truncation=True)
+        labels = self.tokenizer([pair[1] for pair in datasets], return_tensors='pt', padding=True, truncation=True).input_ids
+
+        if torch.cuda.is_available():
+            inputs = {name: tensor.to("cuda") for name, tensor in inputs.items()}
+            labels = labels.to("cuda")
+
+        optimizer = torch.optim.Adam(model.parameters())
+        epochs = 10
+
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            outputs = model(**inputs, labels=labels)
+            loss = outputs.loss
+            loss.backward()
+            optimizer.step()
+
+            print(f"Epoch: {epoch}, Loss: {loss.item()}")
+    
     def console_dialogue_loop(self):
         while True:
             input_text: str = input("Input question:")
