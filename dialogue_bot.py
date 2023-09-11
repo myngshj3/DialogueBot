@@ -86,7 +86,5 @@ class DialogueBot:
     def console_dialogue_loop(self):
         while True:
             input_text: str = input("Input question:")
-            input_utf8: str = input_text.encode(self._config["codec"]).decode("utf-8", errors="replace")
-            response_utf8: str = self.have_dialogue(input_utf8)
-            response: str = response_utf8.encode("utf-8").decode(self._config["codec"], errors="replace")
-            print("output:", response)
+            response: str = self.have_dialogue(input_text)
+            print("Bot:", response)
