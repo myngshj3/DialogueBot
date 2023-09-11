@@ -1,0 +1,9 @@
+{
+    "model_name": "rinna/japanese-gpt2-xsmall",
+    "model_name-rinna": "rinna/japanese-gpt2-xsmall",
+    "model_name_ja": "sonoisa/t5-base-japanese",
+    "model_name_t5-small": "t5-small",
+    "max_input_length": 1024,
+    "max_output_length": 8192,
+    "codec": "Shift_JIS"
+}
