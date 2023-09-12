@@ -88,11 +88,16 @@ class DialogueBot:
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
     
     def read_markdown_file(self, file_path):
-        if file_path.endsWith(".DS_Store"):
+        if file_path.endswith(".DS_Store"):
             return ""
         with open(file_path, "r", encoding="utf-8") as f:
             print("Reading", file_path)
-            content = f.read()
+            content = ""
+            while True:
+                line = f.readline()
+                if line is None:
+                    break
+                content += line + "\n"
         return content
     
     def read_datasets(self, dataset_folder_path):

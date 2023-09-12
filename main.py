@@ -16,6 +16,8 @@ def main():
     bot.configure()
     bot.load_model()
     print("Bot setup done!")
+    bot.learn_from_datasets("data/")
+    print("Bot trained!")
     app.run(host='0.0.0.0', port=5000)
 
 if __name__ == "__main__":
