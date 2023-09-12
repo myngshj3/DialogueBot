@@ -1,4 +1,7 @@
+import os
 import json
+import numpy as np
+import subprocess
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
@@ -33,8 +36,8 @@ class DialogueBot:
 
     def load_model(self):
         model_name = self._config["model_name"]
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir="./model", use_fast=False)
+        model = AutoModelForCausalLM.from_pretrained(model_name, cache_dir="./model")
         self._tokenizer = tokenizer
         self._model = model
         #self._tokenizer = T5Tokenizer.from_pretrained(model_name)
@@ -83,8 +86,72 @@ class DialogueBot:
 
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
     
-    def console_dialogue_loop(self):
-        while True:
-            input_text: str = input("Input question:")
-            response: str = self.have_dialogue(input_text)
-            print("Bot:", response)
+    # def console_dialogue_loop(self):
+    #     while True:
+    #         input_text: str = input("Input question:")
+    #         response: str = self.have_dialogue(input_text)
+    #         print("Bot:", response)
+
+    def read_markdown_file(self, file_path):
+        if file_path.endsWith(".DS_Store"):
+            return ""
+        with open(file_path, "r", encoding="utf-8") as f:
+            print("Reading", file_path)
+            content = f.read()
+        return content
+    
+    def read_datasets(self, dataset_folder_path):
+        entries = ""
+        dataset_filenames = os.listdir(dataset_folder_path)
+        for filename in dataset_filenames:
+            file_path = dataset_folder_path + filename
+            print("Processing", file_path)
+            markdown_content = self.read_markdown_file(file_path)
+            for line in markdown_content.split("\n"):
+                if len(line) > 5:
+                    entries += line + "\n\n"
+
+        n = len(entries)
+        print("Total input entry length", n)
+        return entries, n
+    
+    def learn_from_datasets(self, dataset_folder_path):
+        entries, n = self.read_datasets(dataset_folder_path)
+        trainEntries = entries[:int(n*0.9)]
+        evalEntries = entries[:int(n*0.1)] # 0.9?
+        print("Train entries:", trainEntries, ", Eval entries:", evalEntries)
+
+        max_length = 512
+        trainTokens = []
+        train_text_segments = [trainEntries[i:i+max_length] for i in range(0, len(trainEntries), max_length)]
+        for segment in train_text_segments:
+            train_segment_token = self.tokenizer.encode(segment, add_special_tokens=True)
+            trainTokens.extend(train_segment_token)
+
+        evalTokens = []
+        eval_text_segments = [evalEntries[i:i+max_length] for i in range(0, len(evalEntries), max_length)]
+        for segment in eval_text_segments:
+            eval_segment_tokens = self.tokenizer.encode(segment, add_special_tokens=True)
+            evalTokens.extend(eval_segment_tokens)
+
+        print(len(trainTokens), "used for training;", len(evalTokens), "used for eval")
+
+        train_ids = np.array(trainTokens)
+        eval_ids = np.array(evalTokens)
+        newFolderPath = os.path.join(os.path.dirname(__file__), "TrainingSet")
+        if not os.path.exists(newFolderPath):
+            os.makedirs(newFolderPath)
+        train_ids.tofile(os.path.join(newFolderPath, "train.bin"))
+        eval_ids.tofile(os.path.join(newFolderPath, "eval.bin"))
+
+        subprocess.run(["python",
+                        "--datasets=TrainingSet",
+                        "--n_layer=4",
+                        "--n_head=4",
+                        "--n_embd=64",
+                        "--compile=False",
+                        "--eval_iters=1",
+                        "--block_size=64",
+                        "--batch_size=8",
+                        "--device=mps",
+                        "--eval_interval=100"])
