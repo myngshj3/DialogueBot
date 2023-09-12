@@ -3,8 +3,9 @@ import json
 import numpy as np
 import subprocess
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, LineByLineTextDataset
 from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import AutoModelForMaskedLM, AutoConfig, DataCollatorForLanguageModeling, Trainer, TrainingArguments
 
 
 class DialogueBot:
@@ -86,12 +87,6 @@ class DialogueBot:
 
             print(f"Epoch: {epoch}, Loss: {loss.item()}")
     
-    # def console_dialogue_loop(self):
-    #     while True:
-    #         input_text: str = input("Input question:")
-    #         response: str = self.have_dialogue(input_text)
-    #         print("Bot:", response)
-
     def read_markdown_file(self, file_path):
         if file_path.endsWith(".DS_Store"):
             return ""
@@ -155,3 +150,46 @@ class DialogueBot:
                         "--batch_size=8",
                         "--device=mps",
                         "--eval_interval=100"])
+
+    def console_dialogue_loop(self):
+        while True:
+            input_text: str = input("Input question:")
+            response: str = self.have_dialogue(input_text)
+            print("Bot:", response)
+
+    def train_by_bigtext(self, file_path):
+        # データセットの読み込みと前処理
+        # テキストファイルからデータを読み込む
+        dataset = LineByLineTextDataset(
+            tokenizer=self.tokenizer,
+            file_path=file_path,  # テキストファイルのパス
+            block_size=self.config["dataset_block_size"],  # ブロックサイズ（トークン数）
+        )
+        # データコレーターの設定
+        data_collator = DataCollatorForLanguageModeling(
+            tokenizer=self.tokenizer, mlm=False
+        )
+
+        # トレーニングアーギュメントの設定
+        training_args = TrainingArguments(
+            output_dir=self.config["training_output_dir"],
+            overwrite_output_dir=self.config["overwrite_output_dir"],
+            num_train_epochs=self.config["num_train_epochs"],
+            per_device_train_batch_size=self.config["per_device_train_batch_size"],
+            save_steps=self.config["training_save_steps"],
+            save_total_limit=self.config["training_save_total_limit"],
+        )
+
+        # トレーナーの設定
+        trainer = Trainer(
+            model=self.model,
+            args=training_args,
+            data_collator=data_collator,
+            train_dataset=dataset,
+        )
+
+        # ファインチューニングの実行
+        trainer.train()
+
+        # ファインチューニングされたモデルの保存
+        trainer.save_model()
